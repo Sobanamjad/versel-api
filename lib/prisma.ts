@@ -2,6 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
 // Dynamic import to avoid build-time issues
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let PrismaClient: any;
 
 const prismaClientSingleton = async () => {
@@ -34,10 +35,13 @@ const getPrisma = async () => {
   return prismaInstance;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const prisma = new Proxy({} as any, {
   get(target, prop) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return async (...args: any[]) => {
       const client = await getPrisma();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (client as any)[prop](...args);
     };
   }
