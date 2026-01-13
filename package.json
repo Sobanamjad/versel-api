@@ -4,17 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npx prisma generate --schema=./prisma/schema.prisma && npx next build",
+    "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "prebuild": "npx prisma generate --schema=./prisma/schema.prisma"
+    "lint": "eslint"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.2.0",
-    "@prisma/client": "^7.2.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.6.0",
     "formidable": "^3.5.4",
     "next": "16.1.1",
-    "pg": "^8.16.3",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
@@ -22,12 +20,10 @@
     "@tailwindcss/postcss": "^4",
     "@types/formidable": "^3.4.6",
     "@types/node": "^20",
-    "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
-    "prisma": "^7.2.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
