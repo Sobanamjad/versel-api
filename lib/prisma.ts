@@ -7,7 +7,7 @@ const prismaClientSingleton = () => {
 
   const pool = new Pool({ connectionString });
   const adapter = new PrismaPg(pool);
-  return new PrismaClient({ adapter });
+  return new (PrismaClient as any)({ adapter });
 };
 
 declare global {
