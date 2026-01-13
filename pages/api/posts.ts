@@ -40,12 +40,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(400).json({ error: "Title and description are required" });
           }
 
-          // For now, skip file upload and use a placeholder
+          // Handle file upload
+          const fileRaw = _files.image as File | File[] | undefined;
+          const file = Array.isArray(fileRaw) ? fileRaw[0] : fileRaw;
+
+          let imagePath = "/placeholder-image.jpg"; // Default placeholder
+
+          if (file && file.originalFilename) {
+            try {
+              const ext = path.extname(file.originalFilename);
+              const filename = `${Date.now()}${ext}`;
+
+              // In Vercel, use /tmp for temporary storage
+              const tempDir = process.env.VERCEL ? '/tmp' : uploadDir;
+              const tempPath = path.join(tempDir, filename);
+
+              // Ensure temp directory exists
+              if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
+              }
+
+              // Move file to temp location
+              fs.renameSync(file.filepath, tempPath);
+
+              // For Vercel, we'll use a data URL or cloud storage
+              // For now, just store the filename (would need cloud storage for production)
+              imagePath = `/uploads/${filename}`;
+            } catch (uploadError) {
+              console.error('File upload error:', uploadError);
+              // Continue with placeholder if upload fails
+            }
+          }
+
           const post = await prisma.post.create({
             data: {
               title,
               description,
-              image: "/placeholder-image.jpg", 
+              image: imagePath,
             },
           });
 
@@ -75,15 +106,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!post) return res.status(404).json({ error: "Post not found" });
 
         let imagePath = post.image;
-        if (file && file.originalFilename) {
-          const oldPath = path.join(process.cwd(), "public", post.image);
-          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
 
-          const ext = path.extname(file.originalFilename);
-          const filename = `${Date.now()}${ext}`;
-          const newPath = path.join(uploadDir, filename);
-          fs.renameSync(file.filepath, newPath);
-          imagePath = `/uploads/${filename}`;
+        // Handle file upload for updates
+        const updateFileRaw = files.image as File | File[] | undefined;
+        const updateFile = Array.isArray(updateFileRaw) ? updateFileRaw[0] : updateFileRaw;
+
+        if (updateFile && updateFile.originalFilename) {
+          try {
+            const ext = path.extname(updateFile.originalFilename);
+            const filename = `${Date.now()}${ext}`;
+
+            // In Vercel, use /tmp for temporary storage
+            const tempDir = process.env.VERCEL ? '/tmp' : uploadDir;
+            const tempPath = path.join(tempDir, filename);
+
+            // Ensure temp directory exists
+            if (!fs.existsSync(tempDir)) {
+              fs.mkdirSync(tempDir, { recursive: true });
+            }
+
+            // Move file to temp location
+            fs.renameSync(updateFile.filepath, tempPath);
+
+            // Clean up old file if it exists
+            if (post.image && post.image !== "/placeholder-image.jpg") {
+              const oldPath = path.join(process.env.VERCEL ? '/tmp' : process.cwd(), "public", post.image);
+              try {
+                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+              } catch (cleanupError) {
+                console.log('Could not clean up old file:', cleanupError);
+              }
+            }
+
+            imagePath = `/uploads/${filename}`;
+          } catch (uploadError) {
+            console.error('File upload error:', uploadError);
+            // Keep existing image if upload fails
+          }
         }
 
         const updated = await prisma.post.update({
