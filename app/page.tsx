@@ -20,9 +20,14 @@ const Page = () => {
 
   // ================= FETCH POSTS =================
   const fetchPosts = async () => {
-    const res = await fetch('/api/posts')
-    if (!res.ok) return []
-    return await res.json()
+    try {
+      const res = await fetch('/api/posts')
+      if (!res.ok) return []
+      return await res.json()
+    } catch (error) {
+      console.log('API not available during build, skipping fetch')
+      return []
+    }
   }
 
   useEffect(() => {
