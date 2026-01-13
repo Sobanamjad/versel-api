@@ -1,65 +1,105 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+import React, { useState, useEffect } from 'react'
+import Image from 'next/image'
+
+interface Post {
+  id: number
+  title: string
+  description: string
+  image: string
+  createdAt: string
 }
+
+const Page = () => {
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [image, setImage] = useState<File | null>(null)
+  const [posts, setPosts] = useState<Post[]>([])
+  const [editId, setEditId] = useState<number | null>(null)
+
+  // ================= FETCH POSTS =================
+  const fetchPosts = async () => {
+    const res = await fetch('/api/posts')
+    if (!res.ok) return []
+    return await res.json()
+  }
+
+  useEffect(() => {
+    const loadPosts = async () => {
+      const posts = await fetchPosts()
+      setPosts(posts)
+    }
+    loadPosts()
+  }, [])
+
+  // ================= CREATE POST =================
+  const submit = async () => {
+    if (!title || !description || !image) return alert('All fields required')
+    const formData = new FormData()
+    formData.append('title', title)
+    formData.append('description', description)
+    formData.append('image', image)
+    const res = await fetch('/api/posts', { method: 'POST', body: formData })
+    if (!res.ok) return alert('Failed to save post')
+    setTitle(''); setDescription(''); setImage(null)
+    fetchPosts()
+    alert('Post created')
+  }
+
+  // ================= UPDATE POST =================
+  const updatePost = async () => {
+    if (!editId) return
+    const formData = new FormData()
+    formData.append('id', String(editId))
+    formData.append('title', title)
+    formData.append('description', description)
+    if (image) formData.append('image', image)
+    const res = await fetch('/api/posts', { method: 'PUT', body: formData })
+    if (!res.ok) return alert('Update failed')
+    setEditId(null); setTitle(''); setDescription(''); setImage(null)
+    fetchPosts()
+    alert('Post updated')
+  }
+
+  // ================= DELETE POST =================
+  const deletePost = async (id: number) => {
+    if (!confirm('Are you sure?')) return
+    const res = await fetch(`/api/posts?id=${id}`, { method: 'DELETE' })
+    if (!res.ok) return alert('Delete failed')
+    fetchPosts()
+  }
+
+  // ================= UI =================
+  return (
+    <div style={{ padding: 20 }}>
+      <h1>{editId ? 'Update Post' : 'Create Post'}</h1>
+      <input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} style={{ display: 'block', marginBottom: 10, width: 300, padding: 5 }} />
+      <textarea placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} style={{ display: 'block', marginBottom: 10, width: 300, height: 80, padding: 5 }} />
+      <input type="file" onChange={e => e.target.files && setImage(e.target.files[0])} style={{ display: 'block', marginBottom: 10 }} />
+      <button onClick={editId ? updatePost : submit}>{editId ? 'Update Post' : 'Save Post'}</button>
+      {editId && (
+        <button onClick={() => { setEditId(null); setTitle(''); setDescription(''); setImage(null) }} style={{ marginLeft: 10 }}>
+          Cancel
+        </button>
+      )}
+
+      <hr style={{ margin: '30px 0' }} />
+
+      <h2>All Posts</h2>
+      {posts.length === 0 && <p>No posts yet</p>}
+      {posts.map(post => (
+        <div key={post.id} style={{ border: '1px solid #ccc', padding: 10, marginBottom: 15, width: 320 }}>
+          <h3>{post.title}</h3>
+          <p>{post.description}</p>
+          {post.image && <Image src={post.image} alt={post.title} width={200} height={200} style={{ objectFit: 'contain' }} unoptimized />}
+          <p style={{ fontSize: 12 }}>{new Date(post.createdAt).toLocaleString()}</p>
+          <button onClick={() => { setEditId(post.id); setTitle(post.title); setDescription(post.description); }}>Edit</button>
+          <button onClick={() => deletePost(post.id)} style={{ marginLeft: 10 }}>Delete</button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default Page
