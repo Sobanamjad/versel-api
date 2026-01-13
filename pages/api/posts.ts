@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // ================= GET =================
     if (req.method === "GET") {
-      const posts = prisma.post.findMany();
+      const posts = await prisma.post.findMany();
       return res.status(200).json(posts);
     }
 
@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const newPath = path.join(uploadDir, filename);
         fs.renameSync(file.filepath, newPath);
 
-        const post = prisma.post.create({
+        const post = await prisma.post.create({
           data: {
             title,
             description,
@@ -67,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const fileRaw = files.image as File | File[] | undefined;
         const file: File | undefined = Array.isArray(fileRaw) ? fileRaw[0] : fileRaw;
 
-        const post = prisma.post.findUnique({ where: { id } });
+        const post = await prisma.post.findUnique({ where: { id } });
         if (!post) return res.status(404).json({ error: "Post not found" });
 
         let imagePath = post.image;
@@ -82,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           imagePath = `/uploads/${filename}`;
         }
 
-        const updated = prisma.post.update({
+        const updated = await prisma.post.update({
           where: { id },
           data: { title, description, image: imagePath },
         });
@@ -95,13 +95,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ================= DELETE =================
     if (req.method === "DELETE") {
       const id = Number(req.query.id);
-      const post = prisma.post.findUnique({ where: { id } });
+      const post = await prisma.post.findUnique({ where: { id } });
       if (!post) return res.status(404).json({ error: "Not found" });
 
       const imgPath = path.join(process.cwd(), "public", post.image);
       if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
 
-      prisma.post.delete({ where: { id } });
+      await prisma.post.delete({ where: { id } });
       return res.json({ success: true });
     }
 

@@ -1,47 +1,101 @@
-import Database from "better-sqlite3";
-import path from "path";
+import initSqlJs from "sql.js";
 
-// Database file path
-const dbPath = path.join(process.cwd(), "database.db");
+// Initialize SQLite database
+let db: any = null;
+let SQL: any = null;
 
-// Create database connection
-const db = new Database(dbPath);
+const initializeDatabase = async () => {
+  if (!SQL) {
+    SQL = await initSqlJs();
+  }
 
-// Create posts table if it doesn't exist
-db.exec(`
-  CREATE TABLE IF NOT EXISTS posts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT NOT NULL,
-    image TEXT NOT NULL,
-    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+  if (!db) {
+    // Try to load existing database from a simple in-memory store
+    // In a real app, you'd load from a file or cloud storage
+    db = new SQL.Database();
 
-// Prepare statements for better performance
-const statements = {
-  getAllPosts: db.prepare("SELECT * FROM posts ORDER BY createdAt DESC"),
-  getPostById: db.prepare("SELECT * FROM posts WHERE id = ?"),
-  createPost: db.prepare("INSERT INTO posts (title, description, image) VALUES (?, ?, ?)"),
-  updatePost: db.prepare("UPDATE posts SET title = ?, description = ?, image = ? WHERE id = ?"),
-  deletePost: db.prepare("DELETE FROM posts WHERE id = ?"),
+    // Create posts table if it doesn't exist
+    db.run(`
+      CREATE TABLE IF NOT EXISTS posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        image TEXT NOT NULL,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
+
+  return db;
 };
 
 // Database operations
 export const prisma = {
   post: {
-    findMany: () => statements.getAllPosts.all(),
-    findUnique: (args: { where: { id: number } }) =>
-      statements.getPostById.get(args.where.id) as any,
-    create: (args: { data: { title: string; description: string; image: string } }) => {
-      const result = statements.createPost.run(
-        args.data.title,
-        args.data.description,
-        args.data.image
-      );
-      return { id: result.lastInsertRowid, ...args.data, createdAt: new Date() };
+    findMany: async () => {
+      const database = await initializeDatabase();
+      try {
+        const result = database.exec("SELECT * FROM posts ORDER BY createdAt DESC");
+        if (!result || result.length === 0 || !result[0].values) return [];
+
+        const columns = result[0].columns;
+        const values = result[0].values;
+
+        return values.map((row: any[]) => {
+          const post: any = {};
+          columns.forEach((col: string, index: number) => {
+            post[col] = row[index];
+          });
+          return post;
+        });
+      } catch (error) {
+        console.log('Database query error:', error);
+        return [];
+      }
     },
-    update: (args: { where: { id: number }; data: { title?: string; description?: string; image?: string } }) => {
+
+    findUnique: async (args: { where: { id: number } }) => {
+      const database = await initializeDatabase();
+      try {
+        const result = database.exec("SELECT * FROM posts WHERE id = ?", [args.where.id]);
+
+        if (!result || result.length === 0 || !result[0].values || result[0].values.length === 0) return null;
+
+        const columns = result[0].columns;
+        const values = result[0].values[0];
+
+        const post: any = {};
+        columns.forEach((col: string, index: number) => {
+          post[col] = values[index];
+        });
+        return post;
+      } catch (error) {
+        console.log('Database query error:', error);
+        return null;
+      }
+    },
+
+    create: async (args: { data: { title: string; description: string; image: string } }) => {
+      const database = await initializeDatabase();
+      database.run(
+        "INSERT INTO posts (title, description, image) VALUES (?, ?, ?)",
+        [args.data.title, args.data.description, args.data.image]
+      );
+
+      // Get the last inserted id
+      const result = database.exec("SELECT last_insert_rowid() as id");
+      const id = result[0].values[0][0];
+
+      return {
+        id,
+        ...args.data,
+        createdAt: new Date().toISOString()
+      };
+    },
+
+    update: async (args: { where: { id: number }; data: { title?: string; description?: string; image?: string } }) => {
+      const database = await initializeDatabase();
+
       const updates: string[] = [];
       const values: any[] = [];
 
@@ -60,13 +114,16 @@ export const prisma = {
 
       if (updates.length > 0) {
         values.push(args.where.id);
-        db.prepare(`UPDATE posts SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+        database.run(`UPDATE posts SET ${updates.join(", ")} WHERE id = ?`, values);
       }
 
-      return statements.getPostById.get(args.where.id);
+      // Return the updated post
+      return prisma.post.findUnique(args);
     },
-    delete: (args: { where: { id: number } }) => {
-      statements.deletePost.run(args.where.id);
+
+    delete: async (args: { where: { id: number } }) => {
+      const database = await initializeDatabase();
+      database.run("DELETE FROM posts WHERE id = ?", [args.where.id]);
       return { id: args.where.id };
     },
   },
