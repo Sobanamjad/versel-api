@@ -26,7 +26,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === "POST") {
       try {
         const form = formidable({ uploadDir, keepExtensions: true });
-        form.parse(req, async (err, fields, files) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        form.parse(req, async (err, fields, _files) => {
           if (err) {
             console.error('Form parse error:', err);
             return res.status(500).json({ error: err.message });
@@ -44,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             data: {
               title,
               description,
-              image: "/placeholder-image.jpg", // Placeholder since file upload is complex in serverless
+              image: "/placeholder-image.jpg", 
             },
           });
 
