@@ -1,22 +1,44 @@
-import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-const prismaClientSingleton = () => {
+// Dynamic import to avoid build-time issues
+let PrismaClient: any;
+
+const prismaClientSingleton = async () => {
   const connectionString = process.env.DATABASE_URL;
+
+  // Dynamically import PrismaClient only when needed
+  if (!PrismaClient) {
+    const { PrismaClient: Client } = await import("@prisma/client");
+    PrismaClient = Client;
+  }
 
   const pool = new Pool({ connectionString });
   const adapter = new PrismaPg(pool);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return new (PrismaClient as any)({ adapter });
+  return new PrismaClient({ adapter });
 };
 
 declare global {
-  var prisma: undefined | ReturnType<typeof prismaClientSingleton>;
+  var prisma: undefined | Awaited<ReturnType<typeof prismaClientSingleton>>;
 }
 
-const prismaInstance = globalThis.prisma ?? prismaClientSingleton();
+let prismaInstance: Awaited<ReturnType<typeof prismaClientSingleton>> | undefined;
 
-export const prisma = prismaInstance;
+const getPrisma = async () => {
+  if (!prismaInstance) {
+    prismaInstance = await prismaClientSingleton();
+    if (process.env.NODE_ENV !== "production") {
+      globalThis.prisma = prismaInstance;
+    }
+  }
+  return prismaInstance;
+};
 
-if (process.env.NODE_ENV !== "production") globalThis.prisma = prismaInstance;
+export const prisma = new Proxy({} as any, {
+  get(target, prop) {
+    return async (...args: any[]) => {
+      const client = await getPrisma();
+      return (client as any)[prop](...args);
+    };
+  }
+});
