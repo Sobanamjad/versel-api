@@ -1,6 +1,14 @@
 // Simple in-memory storage that works in serverless environments
 // Note: Data won't persist between function calls, but CRUD will work
-let posts: any[] = [];
+interface Post {
+  id: number;
+  title: string;
+  description: string;
+  image: string;
+  createdAt: string;
+}
+
+const posts: Post[] = [];
 
 export const prisma = {
   post: {
